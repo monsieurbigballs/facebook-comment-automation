@@ -20,34 +20,38 @@
  * 4. Start the server with `node server.js`.
  */
 
+require('dotenv').config();
 const express = require('express');
-const dotenv = require('dotenv');
+const cors = require('cors');
 const axios = require('axios');
 const puppeteer = require('puppeteer');
-const cors = require('cors');
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors()); // Enable CORS for all routes
+app.use(express.json()); // Parse JSON request bodies
 
-// POST endpoint to process Facebook post
 app.post('/processPost', async (req, res) => {
+    console.log('Received payload:', req.body); // Log the incoming payload
     const { postUrl, postDescription } = req.body;
 
+    if (!postUrl || !postDescription) {
+        console.error('Invalid payload:', req.body); // Log invalid payload
+        return res.status(400).json({ success: false, message: 'Invalid payload' });
+    }
+
     try {
-        // Call ChatGPT API to generate a comment
+        console.log('Generating comment for description:', postDescription);
         const comment = await generateComment(postDescription);
-        
-        // Automate Facebook interaction to post the comment
+        console.log('Generated comment:', comment);
+
+        console.log('Posting comment to Facebook for URL:', postUrl);
         await postCommentToFacebook(postUrl, comment);
-        
-        res.json({ success: true, comment });
+        return res.json({ success: true, comment });
     } catch (error) {
         console.error('Error processing post:', error);
-        res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -71,18 +75,14 @@ async function postCommentToFacebook(postUrl, comment) {
     const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     const page = await browser.newPage();
 
-    // Navigate to Facebook login page
     await page.goto('https://www.facebook.com/login');
     await page.type('#email', process.env.FB_USERNAME);
     await page.type('#pass', process.env.FB_PASSWORD);
     await page.click('button[name="login"]');
     await page.waitForNavigation();
 
-    // Navigate to the specific post URL
     await page.goto(postUrl);
     await page.waitForSelector('[aria-label="Write a comment"]');
-
-    // Post the comment
     await page.click('[aria-label="Write a comment"]');
     await page.keyboard.type(comment);
     await page.click('[aria-label="Press enter to post."]');
