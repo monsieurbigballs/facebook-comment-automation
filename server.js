@@ -20,24 +20,27 @@
  * 4. Start the server with `node server.js`.
  */
 
-require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
+const dotenv = require('dotenv');
 const axios = require('axios');
 const puppeteer = require('puppeteer');
+const cors = require('cors');
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors()); // Enable CORS for all routes
-app.use(express.json()); // Parse JSON request bodies
+app.use(cors());
+app.use(express.json());
 
+// POST endpoint to process Facebook post
 app.post('/processPost', async (req, res) => {
-    console.log('Received payload:', req.body); // Log the incoming payload
+    console.log('Received payload:', req.body);
     const { postUrl, postDescription } = req.body;
 
     if (!postUrl || !postDescription) {
-        console.error('Invalid payload:', req.body); // Log invalid payload
+        console.error('Invalid payload:', req.body);
         return res.status(400).json({ success: false, message: 'Invalid payload' });
     }
 
@@ -75,14 +78,18 @@ async function postCommentToFacebook(postUrl, comment) {
     const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     const page = await browser.newPage();
 
+    // Navigate to Facebook login page
     await page.goto('https://www.facebook.com/login');
     await page.type('#email', process.env.FB_USERNAME);
     await page.type('#pass', process.env.FB_PASSWORD);
     await page.click('button[name="login"]');
     await page.waitForNavigation();
 
+    // Navigate to the specific post URL
     await page.goto(postUrl);
     await page.waitForSelector('[aria-label="Write a comment"]');
+
+    // Post the comment
     await page.click('[aria-label="Write a comment"]');
     await page.keyboard.type(comment);
     await page.click('[aria-label="Press enter to post."]');
