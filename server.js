@@ -60,17 +60,23 @@ app.post('/processPost', async (req, res) => {
 
 // Function to generate a comment using ChatGPT API
 async function generateComment(postDescription) {
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: `Generate a unique, engaging comment for the following Facebook post: ${postDescription}` }]
-    }, {
-        headers: {
-            'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
-            'Content-Type': 'application/json'
-        }
-    });
+    try {
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: 'gpt-3.5-turbo',
+            messages: [{ role: 'user', content: `Generate a unique, engaging comment for the following Facebook post: ${postDescription}` }]
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.CHATGPT_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-    return response.data.choices[0].message.content;
+        console.log('OpenAI response:', response.data);
+        return response.data.choices[0].message.content;
+    } catch (error) {
+        console.error('Error generating comment:', error);
+        throw error;
+    }
 }
 
 // Function to automate Facebook login and post comment
@@ -78,23 +84,26 @@ async function postCommentToFacebook(postUrl, comment) {
     const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     const page = await browser.newPage();
 
-    // Navigate to Facebook login page
-    await page.goto('https://www.facebook.com/login');
-    await page.type('#email', process.env.FB_USERNAME);
-    await page.type('#pass', process.env.FB_PASSWORD);
-    await page.click('button[name="login"]');
-    await page.waitForNavigation();
+    try {
+        await page.goto('https://www.facebook.com/login');
+        await page.type('#email', process.env.FB_USERNAME);
+        await page.type('#pass', process.env.FB_PASSWORD);
+        await page.click('button[name="login"]');
+        await page.waitForNavigation();
 
-    // Navigate to the specific post URL
-    await page.goto(postUrl);
-    await page.waitForSelector('[aria-label="Write a comment"]');
+        await page.goto(postUrl);
+        await page.waitForSelector('[aria-label="Write a comment"]');
 
-    // Post the comment
-    await page.click('[aria-label="Write a comment"]');
-    await page.keyboard.type(comment);
-    await page.click('[aria-label="Press enter to post."]');
+        await page.click('[aria-label="Write a comment"]');
+        await page.keyboard.type(comment);
+        await page.click('[aria-label="Press enter to post."]');
 
-    await browser.close();
+        console.log('Comment posted successfully!');
+    } catch (error) {
+        console.error('Error posting comment:', error);
+    } finally {
+        await browser.close();
+    }
 }
 
 // Start the server
